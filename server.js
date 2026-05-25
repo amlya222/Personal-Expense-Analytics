@@ -101,6 +101,90 @@ app.put('/api/transactions/:id', async (req, res) => {
   }
 });
 
+app.get('/api/dashboard', async (req, res) => {
+  try {
+    const transactions = await readTransactions();
+
+    const totals = transactions.reduce(
+      (acc, tx) => {
+        if (tx.amount >= 0) {
+          acc.income += tx.amount;
+        } else {
+          acc.expenses += Math.abs(tx.amount);
+        }
+        return acc;
+      },
+      { income: 0, expenses: 0 }
+    );
+
+    const summaryData = [
+      { label: 'Total Income', value: `$${totals.income.toFixed(2)}`, icon: '📈', change: '+12%' },
+      { label: 'Monthly Savings', value: `$${(totals.income - totals.expenses).toFixed(2)}`, icon: '💾', change: '+5%' },
+      { label: 'Total Budget', value: '$15,200.00', icon: '💰', change: '-2%' },
+      { label: 'Budget Alert', value: '$6,840.00', icon: '⚠️', change: totals.expenses > 15200 ? 'Over Budget' : 'Within Budget' },
+    ];
+
+    const monthMap = {};
+    transactions.forEach((tx) => {
+      const parsed = new Date(tx.date);
+      if (Number.isNaN(parsed.getTime())) {
+        return;
+      }
+      const key = `${parsed.getFullYear()}-${String(parsed.getMonth() + 1).padStart(2, '0')}`;
+      const label = parsed.toLocaleString('default', { month: 'short' });
+      monthMap[key] = monthMap[key] || { month: label, income: 0, expenses: 0, date: parsed };
+      if (tx.amount >= 0) {
+        monthMap[key].income += tx.amount;
+      } else {
+        monthMap[key].expenses += Math.abs(tx.amount);
+      }
+    });
+
+    const chartData = Object.values(monthMap)
+      .sort((a, b) => a.date - b.date)
+      .slice(-6)
+      .map(({ month, income, expenses }) => ({ month, income, expenses }));
+
+    const categoryCounts = {};
+    transactions.forEach((tx) => {
+      if (tx.amount >= 0) {
+        return;
+      }
+      categoryCounts[tx.category] = (categoryCounts[tx.category] || 0) + Math.abs(tx.amount);
+    });
+
+    const categoryData = Object.entries(categoryCounts).map(([name, value], index) => ({
+      name,
+      value,
+      color: ['#10b981', '#f44336', '#2196f3', '#ff9800', '#9c27b0'][index % 5],
+    }));
+
+    const recentTransactions = transactions
+      .slice()
+      .sort((a, b) => new Date(b.date) - new Date(a.date))
+      .slice(0, 4)
+      .map((tx) => ({
+        id: tx.id,
+        date: tx.date,
+        category: tx.category,
+        amount: `${tx.amount >= 0 ? '+' : '-'}$${Math.abs(tx.amount).toFixed(2)}`,
+        method: tx.method,
+        status: tx.status,
+      }));
+
+    const categoryBudgets = [
+      { category: 'Home', budget: '$2,500/$2,500', progress: 87 },
+      { category: 'Food & Dining', budget: '$850/$950', progress: 71 },
+      { category: 'Transport', budget: '$420/$400', budget_alert: true, progress: 105 },
+    ];
+
+    res.json({ summaryData, chartData, categoryData, recentTransactions, categoryBudgets });
+  } catch (error) {
+    console.error('GET /api/dashboard error', error);
+    res.status(500).json({ message: 'Failed to load dashboard data.' });
+  }
+});
+
 app.delete('/api/transactions/:id', async (req, res) => {
   const id = Number(req.params.id);
   try {
