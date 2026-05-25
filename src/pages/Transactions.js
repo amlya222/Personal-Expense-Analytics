@@ -1,18 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import axios from 'axios';
 import './Transactions.css';
 
-function Transactions() {
-  const [transactions, setTransactions] = useState([
-    { id: 1, date: 'Oct 24, 2023', category: 'Food & Dining', description: 'Coffee Shop', amount: -42.50, method: 'Visa', status: 'completed' },
-    { id: 2, date: 'Oct 23, 2023', category: 'Advertising', description: 'Facebook Ad Campaign', amount: -2850.00, method: 'Bank Transfer', status: 'pending' },
-    { id: 3, date: 'Oct 22, 2023', category: 'Entertainment', description: 'Movie Tickets', amount: -25.00, method: 'Debit Card', status: 'completed' },
-    { id: 4, date: 'Oct 21, 2023', category: 'Salary', description: 'Monthly Salary', amount: 12400.00, method: 'Direct Deposit', status: 'completed' },
-    { id: 5, date: 'Oct 20, 2023', category: 'Utilities', description: 'Electricity Bill', amount: -125.50, method: 'Bank Transfer', status: 'completed' },
-    { id: 6, date: 'Oct 19, 2023', category: 'Transport', description: 'Uber Ride', amount: -18.75, method: 'Credit Card', status: 'completed' },
-    { id: 7, date: 'Oct 18, 2023', category: 'Shopping', description: 'Online Shopping', amount: -156.99, method: 'Visa', status: 'completed' },
-    { id: 8, date: 'Oct 17, 2023', category: 'Health', description: 'Doctor Appointment', amount: -85.00, method: 'Debit Card', status: 'completed' },
-  ]);
+const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
+function Transactions() {
+  const [transactions, setTransactions] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
     category: 'All Categories',
     status: 'All Status',
@@ -20,35 +14,100 @@ function Transactions() {
   });
 
   const [showModal, setShowModal] = useState(false);
+  const [editingTransactionId, setEditingTransactionId] = useState(null);
   const [newTransaction, setNewTransaction] = useState({
     date: '',
     category: 'Food & Dining',
     description: '',
     amount: '',
     method: 'Credit Card',
+    status: 'completed',
   });
 
-  const handleAddTransaction = (e) => {
-    e.preventDefault();
-    if (!newTransaction.date || !newTransaction.description || !newTransaction.amount) {
-      alert('Please fill all fields');
-      return;
-    }
-    const transaction = {
-      id: Math.max(...transactions.map(t => t.id), 0) + 1,
-      ...newTransaction,
-      amount: parseFloat(newTransaction.amount),
-      status: 'completed',
-    };
-    setTransactions([transaction, ...transactions]);
+  const resetForm = () => {
+    setEditingTransactionId(null);
     setNewTransaction({
       date: '',
       category: 'Food & Dining',
       description: '',
       amount: '',
       method: 'Credit Card',
+      status: 'completed',
     });
+  };
+
+  const closeModal = () => {
+    resetForm();
     setShowModal(false);
+  };
+
+  const fetchTransactions = async () => {
+    try {
+      const response = await axios.get(`${apiBaseUrl}/api/transactions`);
+      setTransactions(response.data);
+    } catch (error) {
+      console.error('Failed to fetch transactions', error);
+      alert('Unable to load transactions from the backend.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTransactions();
+  }, []);
+
+  const handleAddTransaction = async (e) => {
+    e.preventDefault();
+
+    if (!newTransaction.date || !newTransaction.description || !newTransaction.amount) {
+      alert('Please fill all fields');
+      return;
+    }
+
+    const transactionToSave = {
+      ...newTransaction,
+      amount: parseFloat(newTransaction.amount),
+      status: newTransaction.status || 'completed',
+    };
+
+    try {
+      if (editingTransactionId) {
+        const response = await axios.put(`${apiBaseUrl}/api/transactions/${editingTransactionId}`, transactionToSave);
+        setTransactions(transactions.map((tx) => (tx.id === editingTransactionId ? response.data : tx)));
+      } else {
+        const response = await axios.post(`${apiBaseUrl}/api/transactions`, transactionToSave);
+        setTransactions([response.data, ...transactions]);
+      }
+
+      closeModal();
+    } catch (error) {
+      console.error('Failed to save transaction', error);
+      alert('Unable to save transaction. Please try again.');
+    }
+  };
+
+  const handleDeleteTransaction = async (id) => {
+    try {
+      await axios.delete(`${apiBaseUrl}/api/transactions/${id}`);
+      setTransactions(transactions.filter((tx) => tx.id !== id));
+    } catch (error) {
+      console.error('Failed to delete transaction', error);
+      alert('Unable to delete transaction.');
+    }
+  };
+
+  const handleEditTransaction = (transaction) => {
+    setEditingTransactionId(transaction.id);
+    setNewTransaction({
+      date: transaction.date,
+      category: transaction.category,
+      description: transaction.description,
+      amount: transaction.amount.toString(),
+      method: transaction.method,
+      status: transaction.status || 'completed',
+    });
+    setShowModal(true);
   };
 
   const categories = ['All Categories', 'Food & Dining', 'Transport', 'Entertainment', 'Utilities', 'Shopping', 'Health', 'Salary', 'Advertising'];
@@ -63,12 +122,11 @@ function Transactions() {
       <div className="card">
         <div className="card-header">
           <h2>All Transactions</h2>
-          <button className="btn btn-primary" onClick={() => setShowModal(true)}>
+          <button className="btn btn-primary" onClick={() => { resetForm(); setShowModal(true); }}>
             + Add Expense
           </button>
         </div>
 
-        {/* Filters */}
         <div className="filters-bar">
           <div className="filter-group">
             <label>Last 30 Days</label>
@@ -83,7 +141,7 @@ function Transactions() {
           <div className="filter-group">
             <label>All Categories</label>
             <select value={filters.category} onChange={(e) => setFilters({ ...filters, category: e.target.value })}>
-              {categories.map(cat => (
+              {categories.map((cat) => (
                 <option key={cat}>{cat}</option>
               ))}
             </select>
@@ -112,66 +170,73 @@ function Transactions() {
           <button className="btn btn-secondary btn-small">More Filters</button>
         </div>
 
-        {/* Transactions Table */}
-        <div className="transactions-table">
-          <div className="table-header">
-            <div className="col col-date">Date</div>
-            <div className="col col-category">Category</div>
-            <div className="col col-description">Description</div>
-            <div className="col col-amount">Amount</div>
-            <div className="col col-method">Method</div>
-            <div className="col col-status">Status</div>
-            <div className="col col-actions">Actions</div>
-          </div>
-
-          <div className="table-body">
-            {transactions.map(tx => (
-              <div key={tx.id} className="table-row">
-                <div className="col col-date">{tx.date}</div>
-                <div className="col col-category">
-                  <span className="category-badge">{tx.category}</span>
-                </div>
-                <div className="col col-description">{tx.description}</div>
-                <div className="col col-amount">
-                  <span className={tx.amount > 0 ? 'amount-income' : 'amount-expense'}>
-                    {tx.amount > 0 ? '+' : ''}{tx.amount.toFixed(2)}
-                  </span>
-                </div>
-                <div className="col col-method">{tx.method}</div>
-                <div className="col col-status">
-                  <span className={`status-badge ${tx.status}`}>{tx.status}</span>
-                </div>
-                <div className="col col-actions">
-                  <button className="action-btn" title="Edit">✏️</button>
-                  <button className="action-btn delete" title="Delete">🗑️</button>
-                </div>
+        {loading ? (
+          <div className="loading-state">Loading transactions...</div>
+        ) : (
+          <>
+            <div className="transactions-table">
+              <div className="table-header">
+                <div className="col col-date">Date</div>
+                <div className="col col-category">Category</div>
+                <div className="col col-description">Description</div>
+                <div className="col col-amount">Amount</div>
+                <div className="col col-method">Method</div>
+                <div className="col col-status">Status</div>
+                <div className="col col-actions">Actions</div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Pagination */}
-        <div className="pagination">
-          <span>Showing 1 to 10 of 420 transactions</span>
-          <div className="pagination-controls">
-            <button disabled>←</button>
-            <button className="active">1</button>
-            <button>2</button>
-            <button>3</button>
-            <button>...</button>
-            <button>42</button>
-            <button>→</button>
-          </div>
-        </div>
+              <div className="table-body">
+                {transactions.map((tx) => (
+                  <div key={tx.id} className="table-row">
+                    <div className="col col-date">{tx.date}</div>
+                    <div className="col col-category">
+                      <span className="category-badge">{tx.category}</span>
+                    </div>
+                    <div className="col col-description">{tx.description}</div>
+                    <div className="col col-amount">
+                      <span className={tx.amount > 0 ? 'amount-income' : 'amount-expense'}>
+                        {tx.amount > 0 ? '+' : ''}{tx.amount.toFixed(2)}
+                      </span>
+                    </div>
+                    <div className="col col-method">{tx.method}</div>
+                    <div className="col col-status">
+                      <span className={`status-badge ${tx.status}`}>{tx.status}</span>
+                    </div>
+                    <div className="col col-actions">
+                      <button className="action-btn" title="Edit" onClick={() => handleEditTransaction(tx)}>
+                        ✏️
+                      </button>
+                      <button className="action-btn delete" title="Delete" onClick={() => handleDeleteTransaction(tx.id)}>
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="pagination">
+              <span>Showing 1 to {transactions.length} of {transactions.length} transactions</span>
+              <div className="pagination-controls">
+                <button disabled>←</button>
+                <button className="active">1</button>
+                <button>2</button>
+                <button>3</button>
+                <button>...</button>
+                <button>42</button>
+                <button>→</button>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      {/* Add Transaction Modal */}
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
+        <div className="modal-overlay" onClick={closeModal}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>Add New Transaction</h2>
-              <button className="close-btn" onClick={() => setShowModal(false)}>✕</button>
+              <h2>{editingTransactionId ? 'Edit Transaction' : 'Add New Transaction'}</h2>
+              <button className="close-btn" onClick={closeModal}>✕</button>
             </div>
             <form onSubmit={handleAddTransaction}>
               <div className="form-group">
@@ -189,7 +254,7 @@ function Transactions() {
                   value={newTransaction.category}
                   onChange={(e) => setNewTransaction({ ...newTransaction, category: e.target.value })}
                 >
-                  {categories.slice(1).map(cat => (
+                  {categories.slice(1).map((cat) => (
                     <option key={cat}>{cat}</option>
                   ))}
                 </select>
@@ -228,11 +293,11 @@ function Transactions() {
                 </select>
               </div>
               <div className="modal-actions">
-                <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>
+                <button type="button" className="btn btn-secondary" onClick={closeModal}>
                   Cancel
                 </button>
                 <button type="submit" className="btn btn-primary">
-                  Add Transaction
+                  {editingTransactionId ? 'Save Changes' : 'Add Transaction'}
                 </button>
               </div>
             </form>
