@@ -10,7 +10,6 @@ function Sidebar({ isOpen, onToggle }) {
     { path: '/transactions', label: 'Transactions', icon: '💳' },
     { path: '/analytics', label: 'Analytics', icon: '📈' },
     { path: '/budgets', label: 'Budgets', icon: '💰' },
-    { path: '/reports', label: 'Reports', icon: '📋' },
     { path: '/settings', label: 'Settings', icon: '⚙️' },
   ];
 

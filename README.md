@@ -8,7 +8,6 @@ A comprehensive React-based personal finance management application for tracking
 - **Transactions**: Manage and track all financial transactions with filters
 - **Analytics**: Detailed financial analysis and spending patterns
 - **Budgets**: Set and monitor budgets across different categories
-- **Reports**: Generate comprehensive financial reports
 - **Settings**: Customize application preferences and account settings
 
 ## Project Structure
@@ -27,8 +26,6 @@ src/
 │   ├── Analytics.css
 │   ├── Budgets.js          # Budget management
 │   ├── Budgets.css
-│   ├── Reports.js          # Financial reports
-│   ├── Reports.css
 │   ├── Settings.js         # Application settings
 │   └── Settings.css
 ├── App.js                  # Main app component with routing
@@ -106,14 +103,6 @@ The application will open in your browser at `http://localhost:3000`
 - Budget summary statistics
 - Add new budget functionality
 - Budget recommendations
-
-### Reports
-- Summary statistics
-- Monthly and quarterly views
-- Expense breakdown table
-- Generated reports list
-- Quick action buttons
-- Export and scheduling options
 
 ### Settings
 - Profile management
