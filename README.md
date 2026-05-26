@@ -10,6 +10,13 @@ A comprehensive React-based personal finance management application for tracking
 - **Budgets**: Set and monitor budgets across different categories
 - **Settings**: Customize application preferences and account settings
 
+## Project Snapshots
+<img width="1919" height="861" alt="image" src="https://github.com/user-attachments/assets/c5913229-08bf-4634-a2b6-91025e4d75b7" /><br>
+<img width="1904" height="864" alt="image" src="https://github.com/user-attachments/assets/48189205-1d75-4f8e-990b-b079dd1f2d0f" /><br>
+<img width="1901" height="862" alt="image" src="https://github.com/user-attachments/assets/6cc81bbe-895f-4bc7-b8cf-0bd400cb5c09" /><br>
+<img width="1895" height="866" alt="image" src="https://github.com/user-attachments/assets/8449e286-b8f7-4c61-a657-64207e00e053" /><br>
+<img width="1905" height="860" alt="image" src="https://github.com/user-attachments/assets/df538a5f-0094-451f-b14a-3ee887815b37" />
+
 ## Project Structure
 
 ```
@@ -53,16 +60,11 @@ package.json               # Project dependencies
 
 Start the development server:
 ```bash
-npm start
+npm run dev
 ```
 
 The application will open in your browser at `http://localhost:3000`
 
-## Available Scripts
-
-- `npm start` - Runs the development server
-- `npm build` - Creates a production build
-- `npm test` - Runs the test suite
 
 ## Technologies Used
 
@@ -120,14 +122,6 @@ The application uses a custom CSS design system with:
 - Smooth transitions and hover effects
 - Mobile-friendly design
 
-## Color Scheme
-
-- **Primary**: `#6c2de2` (Purple)
-- **Success**: `#4caf50` (Green)
-- **Warning**: `#ff9800` (Orange)
-- **Danger**: `#f44336` (Red)
-- **Info**: `#2196f3` (Blue)
-
 ## Future Enhancements
 
 - Backend API integration
@@ -140,10 +134,3 @@ The application uses a custom CSS design system with:
 - Advanced analytics
 - Investment tracking
 
-## License
-
-MIT License
-
-## Support
-
-For issues or feature requests, please contact the development team.
