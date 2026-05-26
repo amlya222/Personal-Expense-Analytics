@@ -25,7 +25,10 @@ function Sidebar({ isOpen, onToggle }) {
     load();
     const onUpdate = (e) => {
       const d = e?.detail || {};
-      setUser({ fullName: d.fullName || user.fullName, email: d.email || user.email });
+      setUser((prev) => ({
+        fullName: d.fullName || prev.fullName,
+        email: d.email || prev.email,
+      }));
     };
     window.addEventListener('settings:updated', onUpdate);
     return () => {

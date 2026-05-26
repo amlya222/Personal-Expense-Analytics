@@ -1,5 +1,14 @@
 [
   {
+    "id": 14,
+    "date": "2026-05-26",
+    "category": "Entertainment",
+    "description": "jio hotstar subscription",
+    "amount": -450,
+    "method": "Debit Card",
+    "status": "completed"
+  },
+  {
     "id": 13,
     "date": "2026-05-25",
     "category": "Shopping",

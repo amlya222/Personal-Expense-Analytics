@@ -33,25 +33,24 @@ function Settings() {
   const [editMode, setEditMode] = useState(false);
 
   useEffect(() => {
+    const fetchSettings = async () => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const response = await axios.get(`${apiBaseUrl}/api/settings`);
+        setSettings(response.data);
+        setFormData(response.data);
+      } catch (err) {
+        console.error('Failed to load settings', err);
+        setError('Unable to load settings. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchSettings();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const fetchSettings = async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const response = await axios.get(`${apiBaseUrl}/api/settings`);
-      setSettings(response.data);
-      setFormData(response.data);
-    } catch (err) {
-      console.error('Failed to load settings', err);
-      setError('Unable to load settings. Please try again later.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -224,8 +223,8 @@ function Settings() {
                 <button className="btn btn-secondary" onClick={handleCancel}>
                   Cancel
                 </button>
-                <button className="btn btn-primary" onClick={handleSave}>
-                  Save Changes
+                <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+                  {saving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             )}
@@ -278,8 +277,8 @@ function Settings() {
           </div>
         </div>
 
-        <button className="btn btn-primary" onClick={handleSave}>
-          Save Preferences
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Save Preferences'}
         </button>
       </div>
 
@@ -351,8 +350,8 @@ function Settings() {
           </div>
         </div>
 
-        <button className="btn btn-primary" onClick={handleSave}>
-          Save Notification Settings
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? 'Saving...' : 'Save Notification Settings'}
         </button>
       </div>
 
