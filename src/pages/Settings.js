@@ -1,34 +1,78 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import './Settings.css';
 
+const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || '';
+
+const defaultSettings = {
+  email: 'amit@example.com',
+  fullName: 'Amit Kumar',
+  currency: 'USD',
+  dateFormat: 'MM/DD/YYYY',
+  timezone: 'UTC-5 (Eastern Time)',
+  language: 'English',
+  theme: 'light',
+  notifications: {
+    emailAlerts: true,
+    pushNotifications: true,
+    budgetAlerts: true,
+    transactionUpdates: false,
+  },
+  security: {
+    twoFactor: false,
+    loginAlerts: true,
+  },
+};
+
 function Settings() {
-  const [settings, setSettings] = useState({
-    email: 'amit@example.com',
-    fullName: 'Amit Kumar',
-    currency: 'USD',
-    dateFormat: 'MM/DD/YYYY',
-    timezone: 'UTC-5 (Eastern Time)',
-    language: 'English',
-    theme: 'light',
-    notifications: {
-      emailAlerts: true,
-      pushNotifications: true,
-      budgetAlerts: true,
-      transactionUpdates: false,
-    },
-    security: {
-      twoFactor: false,
-      loginAlerts: true,
-    },
-  });
-
+  const [settings, setSettings] = useState(defaultSettings);
+  const [formData, setFormData] = useState(defaultSettings);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
   const [editMode, setEditMode] = useState(false);
-  const [formData, setFormData] = useState(settings);
 
-  const handleSave = () => {
-    setSettings(formData);
-    setEditMode(false);
-    alert('Settings saved successfully!');
+  useEffect(() => {
+    fetchSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const fetchSettings = async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await axios.get(`${apiBaseUrl}/api/settings`);
+      setSettings(response.data);
+      setFormData(response.data);
+    } catch (err) {
+      console.error('Failed to load settings', err);
+      setError('Unable to load settings. Please try again later.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError('');
+
+    try {
+      const response = await axios.put(`${apiBaseUrl}/api/settings`, formData);
+      setSettings(response.data);
+      setFormData(response.data);
+      setEditMode(false);
+      // notify other components that settings changed
+      try {
+        window.dispatchEvent(new CustomEvent('settings:updated', { detail: response.data }));
+      } catch (e) {}
+      alert('Settings saved successfully!');
+    } catch (err) {
+      console.error('Failed to save settings', err);
+      setError('Failed to save settings. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -55,6 +99,17 @@ function Settings() {
       },
     });
   };
+
+  if (loading) {
+    return (
+      <div className="settings">
+        <div className="page-header">
+          <h1>Settings</h1>
+          <p>Loading settings...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="settings">
@@ -179,6 +234,7 @@ function Settings() {
       </div>
 
       {/* Preferences Section */}
+      {error && <div className="error-banner">{error}</div>}
       <div className="card">
         <div className="card-header">
           <h2>Preferences</h2>

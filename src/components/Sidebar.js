@@ -1,9 +1,38 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import axios from 'axios';
 import './Sidebar.css';
+
+const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || '';
 
 function Sidebar({ isOpen, onToggle }) {
   const location = useLocation();
+
+  const [user, setUser] = useState({ fullName: 'Amit Kumar', email: 'amit@example.com' });
+
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      try {
+        const res = await axios.get(`${apiBaseUrl}/api/settings`);
+        if (mounted && res && res.data) {
+          setUser({ fullName: res.data.fullName || user.fullName, email: res.data.email || user.email });
+        }
+      } catch (e) {
+        // ignore - keep defaults
+      }
+    };
+    load();
+    const onUpdate = (e) => {
+      const d = e?.detail || {};
+      setUser({ fullName: d.fullName || user.fullName, email: d.email || user.email });
+    };
+    window.addEventListener('settings:updated', onUpdate);
+    return () => {
+      mounted = false;
+      window.removeEventListener('settings:updated', onUpdate);
+    };
+  }, []);
 
   const menuItems = [
     { path: '/', label: 'Dashboard', icon: '📊' },
@@ -44,10 +73,10 @@ function Sidebar({ isOpen, onToggle }) {
       {isOpen && (
         <div className="sidebar-footer">
           <div className="user-profile">
-            <div className="avatar">AK</div>
+            <div className="avatar">{(user.fullName || 'A').split(' ').map(n=>n[0]).slice(0,2).join('').toUpperCase()}</div>
             <div className="user-info">
-              <p className="user-name">Amit Kumar</p>
-              <p className="user-email">amit@example.com</p>
+              <p className="user-name">{user.fullName}</p>
+              <p className="user-email">{user.email}</p>
             </div>
           </div>
         </div>

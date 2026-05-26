@@ -1,0 +1,19 @@
+{
+  "email": "test@example.com",
+  "fullName": "amol powar",
+  "currency": "INR - Indian Rupee",
+  "dateFormat": "DD/MM/YYYY",
+  "timezone": "UTC+1",
+  "language": "English",
+  "theme": "dark",
+  "notifications": {
+    "emailAlerts": false,
+    "pushNotifications": true,
+    "budgetAlerts": false,
+    "transactionUpdates": true
+  },
+  "security": {
+    "twoFactor": true,
+    "loginAlerts": false
+  }
+}

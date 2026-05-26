@@ -34,6 +34,9 @@ function Dashboard() {
 
   useEffect(() => {
     fetchDashboard();
+    const onUpdate = () => fetchDashboard();
+    window.addEventListener('settings:updated', onUpdate);
+    return () => window.removeEventListener('settings:updated', onUpdate);
   }, []);
 
   return (
