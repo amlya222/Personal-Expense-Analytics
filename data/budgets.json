@@ -1,0 +1,38 @@
+[
+  {
+    "id": 1,
+    "category": "Food & Dining",
+    "budget": 950,
+    "icon": "🍽️"
+  },
+  {
+    "id": 2,
+    "category": "Transport",
+    "budget": 400,
+    "icon": "🚗"
+  },
+  {
+    "id": 3,
+    "category": "Entertainment",
+    "budget": 500,
+    "icon": "🎬"
+  },
+  {
+    "id": 4,
+    "category": "Utilities",
+    "budget": 300,
+    "icon": "💡"
+  },
+  {
+    "id": 5,
+    "category": "Shopping",
+    "budget": 400,
+    "icon": "🛍️"
+  },
+  {
+    "id": 6,
+    "category": "Health",
+    "budget": 200,
+    "icon": "⚕️"
+  }
+]

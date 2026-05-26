@@ -6,6 +6,7 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 5000;
 const dataFile = path.join(__dirname, 'data', 'transactions.json');
+const budgetsFile = path.join(__dirname, 'data', 'budgets.json');
 const settingsFile = path.join(__dirname, 'data', 'settings.json');
 
 const defaultSettings = {
@@ -63,6 +64,72 @@ async function readSettings() {
 async function writeSettings(settings) {
   await fs.mkdir(path.dirname(settingsFile), { recursive: true });
   await fs.writeFile(settingsFile, JSON.stringify(settings, null, 2), 'utf8');
+}
+
+async function readBudgets() {
+  try {
+    const raw = await fs.readFile(budgetsFile, 'utf8');
+    return JSON.parse(raw);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return [];
+    }
+    throw error;
+  }
+}
+
+async function writeBudgets(budgets) {
+  await fs.mkdir(path.dirname(budgetsFile), { recursive: true });
+  await fs.writeFile(budgetsFile, JSON.stringify(budgets, null, 2), 'utf8');
+}
+
+function getCurrencySymbol(currency) {
+  if (!currency) return '$';
+  const s = String(currency).toUpperCase();
+  if (s.includes('INR')) return '₹';
+  if (s.includes('USD')) return '$';
+  if (s.includes('EUR')) return '€';
+  if (s.includes('GBP')) return '£';
+  return s.split(/\s|-/)[0] || '$';
+}
+
+function buildBudgetResponse(budgets, transactions, currencySymbol) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+
+  const monthlySpentByCategory = transactions.reduce((acc, tx) => {
+    const amount = Number(tx.amount || 0);
+    if (amount >= 0) return acc;
+    const date = new Date(tx.date);
+    if (Number.isNaN(date.getTime())) return acc;
+    if (date.getFullYear() !== currentYear || date.getMonth() !== currentMonth) return acc;
+
+    const category = tx.category || 'Other';
+    acc[category] = (acc[category] || 0) + Math.abs(amount);
+    return acc;
+  }, {});
+
+  return budgets.map((budget) => {
+    const spent = Number((monthlySpentByCategory[budget.category] || 0).toFixed(2));
+    const totalBudget = Number(budget.budget || 0);
+    const remaining = Number((totalBudget - spent).toFixed(2));
+    const progress = totalBudget > 0 ? Math.min((spent / totalBudget) * 100, 100) : 0;
+    const status = spent > totalBudget ? 'over' : 'on-track';
+
+    return {
+      id: budget.id,
+      category: budget.category,
+      icon: budget.icon || '💰',
+      budget: totalBudget,
+      spent,
+      remaining,
+      progress: Number(progress.toFixed(0)),
+      status,
+      budget_alert: spent > totalBudget,
+      currencySymbol,
+    };
+  });
 }
 
 app.get('/api/settings', async (req, res) => {
@@ -234,6 +301,99 @@ app.get('/api/analytics', async (req, res) => {
   } catch (error) {
     console.error('GET /api/analytics error', error);
     res.status(500).json({ message: 'Failed to load analytics data.' });
+  }
+});
+
+app.get('/api/budgets', async (req, res) => {
+  try {
+    const budgets = await readBudgets();
+    const transactions = await readTransactions();
+    const settings = await readSettings();
+    const currencySymbol = getCurrencySymbol(settings.currency);
+    const budgetData = buildBudgetResponse(budgets, transactions, currencySymbol);
+    res.json({ currencySymbol, budgets: budgetData });
+  } catch (error) {
+    console.error('GET /api/budgets error', error);
+    res.status(500).json({ message: 'Failed to load budgets.' });
+  }
+});
+
+app.post('/api/budgets', async (req, res) => {
+  try {
+    const { category, budget, icon } = req.body;
+    if (!category || budget === undefined || budget === null) {
+      return res.status(400).json({ message: 'Category and budget amount are required.' });
+    }
+
+    const budgets = await readBudgets();
+    const nextId = budgets.length ? Math.max(...budgets.map((item) => item.id)) + 1 : 1;
+    const newBudget = {
+      id: nextId,
+      category,
+      budget: Number(budget),
+      icon: icon || '💰',
+    };
+
+    budgets.push(newBudget);
+    await writeBudgets(budgets);
+
+    const settings = await readSettings();
+    const currencySymbol = getCurrencySymbol(settings.currency);
+    const budgetData = buildBudgetResponse(budgets, await readTransactions(), currencySymbol);
+
+    res.status(201).json({ currencySymbol, budgets: budgetData });
+  } catch (error) {
+    console.error('POST /api/budgets error', error);
+    res.status(500).json({ message: 'Failed to save budget.' });
+  }
+});
+
+app.put('/api/budgets/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const { category, budget, icon } = req.body;
+    if (!category || budget === undefined || budget === null) {
+      return res.status(400).json({ message: 'Category and budget amount are required.' });
+    }
+
+    const budgets = await readBudgets();
+    const index = budgets.findIndex((item) => item.id === id);
+    if (index === -1) {
+      return res.status(404).json({ message: 'Budget not found.' });
+    }
+
+    budgets[index] = {
+      ...budgets[index],
+      category,
+      budget: Number(budget),
+      icon: icon || budgets[index].icon || '💰',
+    };
+    await writeBudgets(budgets);
+
+    const settings = await readSettings();
+    const currencySymbol = getCurrencySymbol(settings.currency);
+    const budgetData = buildBudgetResponse(budgets, await readTransactions(), currencySymbol);
+
+    res.json({ currencySymbol, budgets: budgetData });
+  } catch (error) {
+    console.error(`PUT /api/budgets/${req.params.id} error`, error);
+    res.status(500).json({ message: 'Failed to update budget.' });
+  }
+});
+
+app.delete('/api/budgets/:id', async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    const budgets = await readBudgets();
+    const updated = budgets.filter((item) => item.id !== id);
+    if (updated.length === budgets.length) {
+      return res.status(404).json({ message: 'Budget not found.' });
+    }
+    await writeBudgets(updated);
+    res.sendStatus(204);
+  } catch (error) {
+    console.error(`DELETE /api/budgets/${req.params.id} error`, error);
+    res.status(500).json({ message: 'Failed to delete budget.' });
   }
 });
 

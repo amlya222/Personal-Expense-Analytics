@@ -1,15 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import './Budgets.css';
 
+const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+
 function Budgets() {
-  const [budgets, setBudgets] = useState([
-    { id: 1, category: 'Food & Dining', budget: 950, spent: 850, icon: '🍽️', status: 'on-track' },
-    { id: 2, category: 'Transport', budget: 400, spent: 420, icon: '🚗', status: 'over' },
-    { id: 3, category: 'Entertainment', budget: 500, spent: 350, icon: '🎬', status: 'on-track' },
-    { id: 4, category: 'Utilities', budget: 300, spent: 280, icon: '💡', status: 'on-track' },
-    { id: 5, category: 'Shopping', budget: 400, spent: 250, icon: '🛍️', status: 'on-track' },
-    { id: 6, category: 'Health', budget: 200, spent: 180, icon: '⚕️', status: 'on-track' },
-  ]);
+  const [budgets, setBudgets] = useState([]);
+  const [currencySymbol, setCurrencySymbol] = useState('$');
+  const [loadingBudgets, setLoadingBudgets] = useState(true);
+  const [error, setError] = useState(null);
 
   const [showModal, setShowModal] = useState(false);
   const [newBudget, setNewBudget] = useState({
@@ -18,34 +17,86 @@ function Budgets() {
     icon: '💰',
   });
 
-  const handleAddBudget = (e) => {
+  useEffect(() => {
+    const fetchBudgets = async () => {
+      setLoadingBudgets(true);
+      setError(null);
+      try {
+        const response = await axios.get(`${apiBaseUrl}/api/budgets`);
+        setCurrencySymbol(response.data.currencySymbol || '$');
+        setBudgets(response.data.budgets || []);
+      } catch (err) {
+        console.error('Failed to load budgets', err);
+        setError(err.response?.data?.message || 'Unable to load budgets.');
+      } finally {
+        setLoadingBudgets(false);
+      }
+    };
+
+    fetchBudgets();
+  }, []);
+
+  const handleAddBudget = async (e) => {
     e.preventDefault();
     if (!newBudget.category || !newBudget.budget) {
       alert('Please fill all fields');
       return;
     }
-    const budget = {
-      id: Math.max(...budgets.map(b => b.id), 0) + 1,
-      ...newBudget,
-      budget: parseFloat(newBudget.budget),
-      spent: 0,
-      status: 'on-track',
-    };
-    setBudgets([...budgets, budget]);
-    setNewBudget({ category: '', budget: '', icon: '💰' });
-    setShowModal(false);
+
+    try {
+      const response = await axios.post(`${apiBaseUrl}/api/budgets`, {
+        category: newBudget.category,
+        budget: parseFloat(newBudget.budget),
+        icon: newBudget.icon,
+      });
+
+      setCurrencySymbol(response.data.currencySymbol || currencySymbol);
+      setBudgets(response.data.budgets || []);
+      setNewBudget({ category: '', budget: '', icon: '💰' });
+      setShowModal(false);
+    } catch (err) {
+      console.error('Failed to save budget', err);
+      alert(err.response?.data?.message || 'Unable to save budget.');
+    }
   };
 
   const getProgressPercentage = (spent, budget) => {
+    if (!budget) {
+      return spent > 0 ? 100 : 0;
+    }
     return Math.min((spent / budget) * 100, 100);
   };
 
-  const totalBudget = budgets.reduce((acc, b) => acc + b.budget, 0);
-  const totalSpent = budgets.reduce((acc, b) => acc + b.spent, 0);
+  const totalBudget = budgets.reduce((acc, b) => acc + (b.budget || 0), 0);
+  const totalSpent = budgets.reduce((acc, b) => acc + (b.spent || 0), 0);
   const totalRemaining = totalBudget - totalSpent;
 
+  if (loadingBudgets) {
+    return (
+      <div className="budgets">
+        <div className="page-header">
+          <h1>Budget Management</h1>
+          <p>Set and track budgets for different expense categories</p>
+        </div>
+        <div className="loading-state">Loading budgets...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="budgets">
+        <div className="page-header">
+          <h1>Budget Management</h1>
+          <p>Set and track budgets for different expense categories</p>
+        </div>
+        <div className="error-state">{error}</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="budgets">
+      <div className="budgets">
       <div className="page-header">
         <h1>Budget Management</h1>
         <p>Set and track budgets for different expense categories</p>
@@ -55,15 +106,15 @@ function Budgets() {
       <div className="budget-summary">
         <div className="budget-summary-card total">
           <p className="summary-label">Total Monthly Budget</p>
-          <p className="summary-value">${totalBudget.toFixed(2)}</p>
+          <p className="summary-value">{currencySymbol}{totalBudget.toFixed(2)}</p>
         </div>
         <div className="budget-summary-card spent">
           <p className="summary-label">Total Spent</p>
-          <p className="summary-value">${totalSpent.toFixed(2)}</p>
+          <p className="summary-value">{currencySymbol}{totalSpent.toFixed(2)}</p>
         </div>
         <div className="budget-summary-card remaining">
           <p className="summary-label">Total Remaining</p>
-          <p className="summary-value">${totalRemaining.toFixed(2)}</p>
+          <p className="summary-value">{currencySymbol}{totalRemaining.toFixed(2)}</p>
         </div>
         <div className="budget-summary-card health">
           <p className="summary-label">Budget Health</p>
@@ -76,7 +127,7 @@ function Budgets() {
         <div className="overall-progress">
           <div className="progress-info">
             <h3>Overall Budget Progress</h3>
-            <p>${totalSpent.toFixed(2)} of ${totalBudget.toFixed(2)} spent</p>
+            <p>{currencySymbol}{totalSpent.toFixed(2)} of {currencySymbol}{totalBudget.toFixed(2)} spent</p>
           </div>
           <div className="overall-progress-bar">
             <div
@@ -84,7 +135,7 @@ function Budgets() {
               style={{ width: `${getProgressPercentage(totalSpent, totalBudget)}%` }}
             ></div>
           </div>
-          <p className="progress-percentage">{Math.round((totalSpent / totalBudget) * 100)}%</p>
+          <p className="progress-percentage">{totalBudget ? Math.round((totalSpent / totalBudget) * 100) : 0}%</p>
         </div>
       </div>
 
@@ -120,24 +171,24 @@ function Budgets() {
                     ></div>
                   </div>
                   <div className="progress-labels">
-                    <span>${budget.spent.toFixed(2)}</span>
-                    <span>${budget.budget.toFixed(2)}</span>
+                    <span>{currencySymbol}{budget.spent.toFixed(2)}</span>
+                    <span>{currencySymbol}{budget.budget.toFixed(2)}</span>
                   </div>
                 </div>
 
                 <div className="budget-details">
                   <div className="budget-detail">
                     <p className="detail-label">Budget</p>
-                    <p className="detail-value">${budget.budget.toFixed(2)}</p>
+                    <p className="detail-value">{currencySymbol}{budget.budget.toFixed(2)}</p>
                   </div>
                   <div className="budget-detail">
                     <p className="detail-label">Spent</p>
-                    <p className="detail-value">${budget.spent.toFixed(2)}</p>
+                    <p className="detail-value">{currencySymbol}{budget.spent.toFixed(2)}</p>
                   </div>
                   <div className="budget-detail">
                     <p className="detail-label">Remaining</p>
                     <p className={`detail-value ${remaining < 0 ? 'over' : ''}`}>
-                      ${Math.abs(remaining).toFixed(2)}
+                      {currencySymbol}{Math.abs(remaining).toFixed(2)}
                     </p>
                   </div>
                 </div>
