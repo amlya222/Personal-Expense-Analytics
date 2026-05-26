@@ -1,49 +1,74 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { LineChart, Line, BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import axios from 'axios';
 import './Analytics.css';
 
-function Analytics() {
-  const monthlyData = [
-    { month: 'Jan', income: 8000, expenses: 5200, savings: 2800 },
-    { month: 'Feb', income: 9200, expenses: 5800, savings: 3400 },
-    { month: 'Mar', income: 8800, expenses: 6200, savings: 2600 },
-    { month: 'Apr', income: 10200, expenses: 6800, savings: 3400 },
-    { month: 'May', income: 9500, expenses: 5900, savings: 3600 },
-    { month: 'Jun', income: 11200, expenses: 7200, savings: 4000 },
-  ];
+const apiBaseUrl = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
-  const categorySpending = [
-    { category: 'Food & Dining', value: 2400, percentage: 24 },
-    { category: 'Transport', value: 1800, percentage: 18 },
-    { category: 'Entertainment', value: 1500, percentage: 15 },
-    { category: 'Utilities', value: 2000, percentage: 20 },
-    { category: 'Shopping', value: 1300, percentage: 13 },
-    { category: 'Health', value: 1000, percentage: 10 },
-  ];
+function Analytics() {
+  const [metrics, setMetrics] = useState([]);
+  const [monthlyData, setMonthlyData] = useState([]);
+  const [categorySpending, setCategorySpending] = useState([]);
+  const [spendingTrend, setSpendingTrend] = useState([]);
+  const [topExpenses, setTopExpenses] = useState([]);
+  const [categoryAnalysis, setCategoryAnalysis] = useState([]);
+  const [currencySymbol, setCurrencySymbol] = useState('$');
+  const [insights, setInsights] = useState([]);
+  const [budgetAlerts, setBudgetAlerts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const colors = ['#10b981', '#f44336', '#2196f3', '#ff9800', '#9c27b0', '#00bcd4'];
 
-  const spendingTrend = [
-    { week: 'W1', spending: 1200 },
-    { week: 'W2', spending: 1450 },
-    { week: 'W3', spending: 1100 },
-    { week: 'W4', spending: 1650 },
-  ];
+  useEffect(() => {
+    const fetchAnalytics = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await axios.get(`${apiBaseUrl}/api/analytics`);
+        const data = response.data;
+        setCurrencySymbol(data.currencySymbol || '$');
+        setMetrics(data.metrics || []);
+        setMonthlyData(data.monthlyData || []);
+        setCategorySpending(data.categorySpending || []);
+        setSpendingTrend(data.spendingTrend || []);
+        setTopExpenses(data.topExpenses || []);
+        setCategoryAnalysis(data.categoryAnalysis || []);
+        setInsights(data.insights || []);
+        setBudgetAlerts(data.budgetAlerts || []);
+      } catch (err) {
+        console.error('Failed to load analytics data', err);
+        setError(err.response?.data?.message || 'Unable to load analytics data.');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const topExpenses = [
-    { category: 'Groceries', amount: 450, percentage: 15 },
-    { category: 'Rent', amount: 1200, percentage: 40 },
-    { category: 'Entertainment', amount: 300, percentage: 10 },
-    { category: 'Transport', amount: 250, percentage: 8 },
-    { category: 'Dining Out', amount: 320, percentage: 11 },
-  ];
+    fetchAnalytics();
+  }, []);
 
-  const metrics = [
-    { label: 'Average Daily Spending', value: '$85.50', change: '-5.2%' },
-    { label: 'Highest Spending Day', value: 'Friday', amount: '$450' },
-    { label: 'Most Spent Category', value: 'Rent', amount: '$1,200' },
-    { label: 'Budget Health', value: '78%', status: 'Good' },
-  ];
+  if (loading) {
+    return (
+      <div className="analytics">
+        <div className="page-header">
+          <h1>Analytics</h1>
+          <p>Loading analytics data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="analytics">
+        <div className="page-header">
+          <h1>Analytics</h1>
+          <p>Detailed insights into your spending patterns and financial behavior</p>
+        </div>
+        <div className="error-state">{error}</div>
+      </div>
+    );
+  }
 
   return (
     <div className="analytics">
@@ -154,7 +179,7 @@ function Analytics() {
                   </div>
                 </div>
                 <div className="expense-amount">
-                  <p className="amount">${expense.amount}</p>
+                  <p className="amount">{currencySymbol}{Number(expense.amount).toFixed(2)}</p>
                   <span className="percentage">{expense.percentage}%</span>
                 </div>
               </div>
@@ -176,17 +201,17 @@ function Analytics() {
             <div className="cat-col">Remaining</div>
             <div className="cat-col">Status</div>
           </div>
-          {categorySpending.slice(0, 4).map((cat, idx) => (
+          {categoryAnalysis.map((cat, idx) => (
             <div key={idx} className="category-table-row">
               <div className="cat-col">
-                <span className="category-badge" style={{ backgroundColor: colors[idx] }}></span>
+                <span className="category-badge" style={{ backgroundColor: cat.color || colors[idx] }}></span>
                 {cat.category}
               </div>
-              <div className="cat-col">${cat.value}</div>
-              <div className="cat-col">${Math.floor(cat.value * 1.2)}</div>
-              <div className="cat-col">${Math.floor(cat.value * 0.2)}</div>
+              <div className="cat-col">{cat.current !== undefined ? `${currencySymbol}${Number(cat.current).toFixed(2)}` : '-'}</div>
+              <div className="cat-col">{cat.budget !== undefined ? `${currencySymbol}${Number(cat.budget).toFixed(2)}` : '-'}</div>
+              <div className="cat-col">{cat.remaining !== undefined ? `${currencySymbol}${Number(cat.remaining).toFixed(2)}` : '-'}</div>
               <div className="cat-col">
-                <span className="status-badge in-budget">On Track</span>
+                <span className={`status-badge ${cat.status === 'Good' || cat.status === 'On Track' ? 'in-budget' : 'alert'}`}>{cat.status}</span>
               </div>
             </div>
           ))}
@@ -202,18 +227,13 @@ function Analytics() {
           <div className="insight-box">
             <h3>Smart Insights</h3>
             <ul className="insights-list">
-              <li>Your food expenses increased by 23% in the past month</li>
-              <li>You're saving an average of $3,467 per month</li>
-              <li>Transport costs are 5% higher than usual</li>
-              <li>Consider reducing dining expenses to meet savings goals</li>
+              {insights.length ? insights.map((item, idx) => <li key={idx}>{item}</li>) : <li>No insights available yet.</li>}
             </ul>
           </div>
           <div className="insight-box warning">
             <h3>Budget Alerts</h3>
             <ul className="insights-list">
-              <li>Entertainment category approaching limit</li>
-              <li>Utilities exceeded budget by $150</li>
-              <li>Shopping category usage increased 12%</li>
+              {budgetAlerts.length ? budgetAlerts.map((item, idx) => <li key={idx}>{item}</li>) : <li>No budget alerts at this time.</li>}
             </ul>
           </div>
         </div>

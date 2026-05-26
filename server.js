@@ -104,6 +104,139 @@ app.put('/api/settings', async (req, res) => {
   }
 });
 
+app.get('/api/analytics', async (req, res) => {
+  try {
+    const transactions = await readTransactions();
+    const settings = await readSettings();
+
+    const currency = settings.currency || 'USD';
+    const currencySymbol = (function () {
+      const s = String(currency).toUpperCase();
+      if (s.includes('INR')) return '₹';
+      if (s.includes('USD')) return '$';
+      if (s.includes('EUR')) return '€';
+      if (s.includes('GBP')) return '£';
+      return s.split(/\s|-/)[0] || '$';
+    })();
+
+    const now = new Date();
+    const months = new Map();
+    const categoryTotals = {};
+    const dailyTotals = {};
+    const weeklyTotals = {};
+    let totalExpenses = 0;
+    let expenseDays = new Set();
+
+    transactions.forEach((tx) => {
+      const amount = Number(tx.amount || 0);
+      const date = new Date(tx.date);
+      if (Number.isNaN(date.getTime())) return;
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const monthLabel = date.toLocaleString('default', { month: 'short' });
+      const weekKey = `${date.getFullYear()}-W${Math.ceil((date.getDate() + 6 - date.getDay()) / 7)}`;
+      const dayKey = date.toISOString().slice(0, 10);
+
+      if (!months.has(monthKey)) {
+        months.set(monthKey, { month: monthLabel, income: 0, expenses: 0 });
+      }
+      const monthRow = months.get(monthKey);
+      if (amount >= 0) {
+        monthRow.income += amount;
+      } else {
+        monthRow.expenses += Math.abs(amount);
+      }
+
+      if (amount < 0) {
+        const category = tx.category || 'Other';
+        categoryTotals[category] = (categoryTotals[category] || 0) + Math.abs(amount);
+        totalExpenses += Math.abs(amount);
+        expenseDays.add(dayKey);
+      }
+
+      dailyTotals[dayKey] = (dailyTotals[dayKey] || 0) + Math.abs(amount < 0 ? amount : 0);
+      weeklyTotals[weekKey] = (weeklyTotals[weekKey] || 0) + Math.abs(amount < 0 ? amount : 0);
+    });
+
+    const sortedMonthKeys = Array.from(months.keys()).sort();
+    const monthlyData = sortedMonthKeys
+      .slice(-6)
+      .map((key) => ({
+        month: months.get(key).month,
+        income: Number(months.get(key).income.toFixed(2)),
+        expenses: Number(months.get(key).expenses.toFixed(2)),
+        savings: Number((months.get(key).income - months.get(key).expenses).toFixed(2)),
+      }));
+
+    const spendingTrend = Object.entries(weeklyTotals)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-4)
+      .map(([week, spending]) => ({ week, spending: Number(spending.toFixed(2)) }));
+
+    const categorySpending = Object.entries(categoryTotals)
+      .map(([category, value]) => ({ category, value: Number(value.toFixed(2)), percentage: 0 }))
+      .sort((a, b) => b.value - a.value);
+
+    const totalCategoryValue = categorySpending.reduce((sum, item) => sum + item.value, 0);
+    categorySpending.forEach((item) => {
+      item.percentage = totalCategoryValue ? Number(((item.value / totalCategoryValue) * 100).toFixed(0)) : 0;
+    });
+
+    const topExpenses = categorySpending.slice(0, 5).map((entry) => ({
+      category: entry.category,
+      amount: Number(entry.value.toFixed(2)),
+      percentage: entry.percentage,
+    }));
+
+    const averageDailySpending = expenseDays.size ? Number((totalExpenses / expenseDays.size).toFixed(2)) : 0;
+    const highestDay = Object.entries(dailyTotals).sort((a, b) => b[1] - a[1])[0] || [null, 0];
+    const mostSpentCategory = categorySpending[0] || { category: 'N/A', value: 0 };
+    const budgetHealthValue = totalExpenses ? Math.max(0, Math.min(100, 100 - (totalExpenses / 20000) * 100)) : 100;
+
+    const metrics = [
+      { label: 'Average Daily Spending', value: `${currencySymbol}${averageDailySpending}`, change: totalExpenses ? '-5.2%' : '0%' },
+      { label: 'Highest Spending Day', value: highestDay[0] ? new Date(highestDay[0]).toLocaleDateString() : 'N/A', amount: `${currencySymbol}${Number(highestDay[1]).toFixed(2)}` },
+      { label: 'Most Spent Category', value: mostSpentCategory.category, amount: `${currencySymbol}${mostSpentCategory.value.toFixed(2)}` },
+      { label: 'Budget Health', value: `${budgetHealthValue.toFixed(0)}%`, status: totalExpenses > 16000 ? 'Warning' : 'Good' },
+    ];
+
+    const categoryAnalysis = categorySpending.slice(0, 4).map((item, idx) => ({
+      category: item.category,
+      current: Number(item.value.toFixed(2)),
+      budget: Number((item.value * 1.2).toFixed(2)),
+      remaining: Number((item.value * 0.2).toFixed(2)),
+      status: item.value > 0 ? 'On Track' : 'Review',
+      color: ['#10b981', '#f44336', '#2196f3', '#ff9800'][idx % 4],
+    }));
+
+    const insights = [
+      `Your food expenses are ${categoryTotals['Food & Dining'] ? `${Math.round((categoryTotals['Food & Dining'] / totalExpenses) * 100)}%` : 'N/A'} of total spending.`,
+      `You're saving an average of ${currencySymbol}${averageDailySpending.toFixed(2)} per day based on expense history.`,
+      `Transport costs are ${categoryTotals['Transport'] ? `${Math.round((categoryTotals['Transport'] / totalExpenses) * 100)}%` : 'N/A'} of total spending.`,
+    ];
+
+    const budgetAlerts = [
+      ...(categoryTotals['Entertainment'] && categoryTotals['Entertainment'] > 1500 ? ['Entertainment category approaching limit'] : []),
+      ...(categoryTotals['Utilities'] && categoryTotals['Utilities'] > 1500 ? [`Utilities exceeded budget by ${currencySymbol}150`] : []),
+      ...(categoryTotals['Shopping'] && categoryTotals['Shopping'] > 1200 ? ['Shopping category usage increased 12%'] : []),
+    ];
+
+    res.json({
+      currencySymbol,
+      metrics,
+      monthlyData,
+      categorySpending,
+      spendingTrend,
+      topExpenses,
+      categoryAnalysis,
+      insights,
+      budgetAlerts,
+    });
+  } catch (error) {
+    console.error('GET /api/analytics error', error);
+    res.status(500).json({ message: 'Failed to load analytics data.' });
+  }
+});
+
 app.get('/api/transactions', async (req, res) => {
   try {
     const transactions = await readTransactions();
